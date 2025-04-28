@@ -1,0 +1,4 @@
+# file: /Users/brantbremer/Computer_Science/Capstone1_4090/cs4090-assignment-4/src/tasks.py
+# hypothesis_version: 6.131.9
+
+['%Y-%m-%d', 'category', 'completed', 'daily', 'description', 'due_date', 'id', 'monthly', 'priority', 'r', 'recurrence', 'subtasks', 'tags', 'tasks.json', 'title', 'w', 'weekly', 'yearly']
