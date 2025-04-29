@@ -11,33 +11,17 @@ from tasks import (load_tasks, save_tasks, filter_tasks_by_priority,
                    set_task_recurrence, get_next_occurrence_date,
                    generate_next_occurrence, get_overdue_tasks)
 
-# Improved path resolution that works in both local and Streamlit deployment environments
-# Get the directory where the current file (app.py) is located
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-
-# Determine project root - might be current directory or parent depending on deployment
-if os.path.exists(os.path.join(CURRENT_DIR, 'tests')):
-    # Tests directory is directly under current directory
-    PROJECT_ROOT = CURRENT_DIR
-elif os.path.exists(os.path.join(os.path.dirname(CURRENT_DIR), 'tests')):
-    # Tests directory is under parent directory
-    PROJECT_ROOT = os.path.dirname(CURRENT_DIR)
-else:
-    # Default fallback - might need to be adjusted
-    PROJECT_ROOT = CURRENT_DIR
-
-# Define test paths
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 TEST_PATH = os.path.join(PROJECT_ROOT, 'tests')
-TEST_PATH_BASIC = os.path.join(TEST_PATH, 'test_basic.py')
-TEST_PATH_ADVANCED = os.path.join(TEST_PATH, 'test_advanced.py')
-TEST_PATH_TDD = os.path.join(TEST_PATH, 'test_tdd.py')
-TEST_PATH_BDD = os.path.join(TEST_PATH, 'features')
-TEST_PATH_PROP = os.path.join(TEST_PATH, 'test_property.py')
+TEST_PATH_BASIC = os.path.join(PROJECT_ROOT, 'tests', 'test_basic.py')
+TEST_PATH_ADVANCED = os.path.join(PROJECT_ROOT, 'tests', 'test_advanced.py')
+TEST_PATH_TDD = os.path.join(PROJECT_ROOT, 'tests', 'test_tdd.py')
+TEST_PATH_BDD = os.path.join(PROJECT_ROOT, 'tests', 'features')
+TEST_PATH_PROP = os.path.join(PROJECT_ROOT, 'tests', 'test_property.py')
 
 # For debugging purposes
 def print_directory_structure():
     """Print the directory structure to help debug deployment issues"""
-    st.write("Current Directory:", CURRENT_DIR)
     st.write("Project Root:", PROJECT_ROOT)
     st.write("Test Path:", TEST_PATH)
     st.write("Tests Directory Exists:", os.path.exists(TEST_PATH))
@@ -292,12 +276,17 @@ def main():
     st.markdown("---")
     
     # Testing Suite section
-    st.header("Testing Suite!")
+    st.header("Testing Suite")
 
     # Debug section only displayed when needed
     if st.checkbox("Show Debug Info"):
         st.subheader("Debug Information")
         print_directory_structure()
+    
+    if "test_result" not in st.session_state:
+        st.session_state.test_result = ""
+    if "test_ran" not in st.session_state:
+        st.session_state.test_ran = False
     
     # Unit Testing Section
     st.subheader("Unit Testing")
@@ -308,21 +297,20 @@ def main():
     
     if st.button("Run Unit Tests"):
         with st.spinner("Running unit tests..."):
-            result = run_test_command(
-                ["pytest"], 
-                ["--maxfail=1", "--disable-warnings", TEST_PATH_BASIC]
+            result = subprocess.run(
+                [sys.executable, "-m", "pytest", "--maxfail=1", "--disable-warnings", TEST_PATH_BASIC],
+                capture_output=True,
+                text=True
             )
-            
-            if result["success"]:
+            st.session_state.test_result = result.stdout
+            st.session_state.test_ran = True
+
+            if result.returncode == 0:
                 st.success("Unit tests completed successfully!")
             else:
                 st.error("Unit tests encountered issues.")
             
-            st.code(result["stdout"], language="text")
             
-            if result["stderr"]:
-                with st.expander("Error Output"):
-                    st.code(result["stderr"], language="text")
 
     # Coverage Testing Section
     st.subheader("Coverage Testing")
@@ -334,24 +322,18 @@ def main():
     if st.button("Run Coverage Tests"):
         with st.spinner("Running coverage tests..."):
             # Ensure test_results directory exists
-            os.makedirs(os.path.join(PROJECT_ROOT, "test_results"), exist_ok=True)
-            
-            # Generate timestamp for unique report name
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            report_dir = os.path.join(PROJECT_ROOT, "test_results", f"coverage_{timestamp}")
-            
-            result = run_test_command(
-                ["pytest"],
-                ["--cov=tasks", f"--cov-report=html:{report_dir}", TEST_PATH]
+            result = subprocess.run(
+                [sys.executable, "-m", "pytest", "--cov=src", TEST_PATH_BASIC, TEST_PATH_ADVANCED, TEST_PATH_TDD, TEST_PATH_BDD, TEST_PATH_PROP],
+                capture_output=True,
+                text=True
             )
-            
-            if result["success"]:
+            st.session_state.test_result = result.stdout
+            st.session_state.test_ran = True
+
+            if result.returncode == 0:
                 st.success("Coverage tests completed successfully!")
-                st.markdown(f"Coverage report saved to: `{report_dir}`")
             else:
                 st.error("Coverage tests encountered issues.")
-                
-            st.code(result["stdout"], language="text")
 
     # Parameterized Testing Section
     st.subheader("Parameterized Testing")
@@ -363,19 +345,20 @@ def main():
     if st.button("Run Parameterized Tests"):
         with st.spinner("Running parameterized tests..."):
             # Test path is determined dynamically to work in both environments
-            param_test_path = os.path.join(TEST_PATH_ADVANCED).replace(PROJECT_ROOT + os.path.sep, "")
-            
-            result = run_test_command(
-                ["pytest"],
-                [f"{param_test_path}::test_filter_by_priority_parameterized", "-v"]
+            result = subprocess.run(
+            [sys.executable, "-m", "pytest", TEST_PATH_ADVANCED, "-v", "-k", "test_filter_by_priority_parameterized"],
+            capture_output=True,
+            text=True
             )
-            
-            if result["success"]:
+            st.session_state.test_result = result.stdout
+            st.session_state.test_ran = True
+
+            if result.returncode == 0:
                 st.success("Parameterized tests completed successfully!")
             else:
                 st.error("Parameterized tests encountered issues.")
-                
-            st.code(result["stdout"], language="text")
+
+            st.code(result.stdout, language="text")
 
     # Mock Testing Section
     st.subheader("Mock Testing")
@@ -387,19 +370,20 @@ def main():
     if st.button("Run Mock Tests"):
         with st.spinner("Running mock tests..."):
             # Test path is determined dynamically
-            mock_test_path = os.path.join(TEST_PATH_ADVANCED).replace(PROJECT_ROOT + os.path.sep, "")
-            
-            result = run_test_command(
-                ["pytest"],
-                [f"{mock_test_path}::test_load_tasks_with_mock", "-v"]
+            result = subprocess.run(
+                [sys.executable, "-m", "pytest", TEST_PATH_ADVANCED, "-v", "-k", "test_load_tasks_with_mock"],
+                capture_output=True,
+                text=True
             )
-            
-            if result["success"]:
+            st.session_state.test_result = result.stdout
+            st.session_state.test_ran = True
+
+            if result.returncode == 0:
                 st.success("Mock tests completed successfully!")
             else:
                 st.error("Mock tests encountered issues.")
-                
-            st.code(result["stdout"], language="text")
+
+            st.code(result.stdout, language="text")
 
     # HTML Report Section
     st.subheader("HTML Test Report")
@@ -439,17 +423,20 @@ def main():
 
     if st.button("Run TDD Tests"):
         with st.spinner("Running TDD tests..."):
-            result = run_test_command(
-                ["pytest"],
-                [TEST_PATH_TDD, "-v"]
+            result = subprocess.run(
+                [sys.executable, "-m", "pytest", TEST_PATH_TDD, "-v"],
+                capture_output=True,
+                text=True
             )
-            
-            if result["success"]:
+            st.session_state.test_result = result.stdout
+            st.session_state.test_ran = True
+
+            if result.returncode == 0:
                 st.success("✅ All TDD tests passed!")
             else:
                 st.error("❌ Some TDD tests failed")
-                
-            st.code(result["stdout"], language="text")
+
+        st.code(result.stdout, language="text")
     
     # BDD Testing Section
     st.subheader("Behavior-Driven Development (BDD)")
@@ -461,26 +448,20 @@ def main():
 
     if st.button("Run BDD Tests"):
         with st.spinner("Running BDD tests..."):
-            try:
-                # BDD tests require behave, which needs a different command structure
-                result = subprocess.run(
-                    ["behave", TEST_PATH_BDD],
-                    capture_output=True,
-                    text=True,
-                    cwd=PROJECT_ROOT
-                )
-                
-                if result.returncode == 0:
-                    st.success("✅ All BDD tests passed!")
-                else:
-                    st.error("❌ Some BDD tests failed")
-                    
-                st.code(result.stdout, language="text")
-                if result.stderr:
-                    with st.expander("Error Output"):
-                        st.code(result.stderr, language="text")
-            except Exception as e:
-                st.error(f"Error running BDD tests: {str(e)}")
+            result = subprocess.run(
+                [sys.executable, "-m", "pytest", "--disable-warnings", TEST_PATH_BDD],
+                capture_output=True,
+                text=True
+            )
+            st.session_state.test_result = result.stdout
+            st.session_state.test_ran = True
+
+            if result.returncode == 0:
+                st.success("BDD tests completed successfully!")
+            else:
+                st.error("BDD tests encountered issues.")
+
+        st.code(result.stdout, language="text")
 
     # Property-Based Testing Section
     st.subheader("Property-Based Testing")
@@ -492,17 +473,20 @@ def main():
 
     if st.button("Run Property-Based Tests"):
         with st.spinner("Running property-based tests..."):
-            result = run_test_command(
-                ["pytest"],
-                [TEST_PATH_PROP, "-v"]
+            result = subprocess.run(
+                [sys.executable, "-m", "pytest", TEST_PATH_PROP, "-v"],
+                capture_output=True,
+                text=True
             )
-            
-            if result["success"]:
+            st.session_state.test_result = result.stdout
+            st.session_state.test_ran = True
+
+            if result.returncode == 0:
                 st.success("✅ All property-based tests passed!")
             else:
                 st.error("❌ Some property-based tests failed")
-                
-            st.code(result["stdout"], language="text")
+
+            st.code(result.stdout, language="text")
 
 def parse_test_output(output):
     """Parse pytest output to extract test results"""
