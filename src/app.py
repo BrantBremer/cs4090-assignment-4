@@ -292,7 +292,7 @@ def main():
     st.markdown("---")
     
     # Testing Suite section
-    st.header("Testing Suite")
+    st.header("Testing Suite!")
 
     # Debug section only displayed when needed
     if st.checkbox("Show Debug Info"):
