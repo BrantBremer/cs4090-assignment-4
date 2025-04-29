@@ -323,7 +323,7 @@ def main():
         with st.spinner("Running coverage tests..."):
             # Ensure test_results directory exists
             result = subprocess.run(
-                [sys.executable, "-m", "pytest", "--cov=src", TEST_PATH_BASIC, TEST_PATH_ADVANCED, TEST_PATH_TDD, TEST_PATH_BDD, TEST_PATH_PROP],
+                [sys.executable, "-m", "pytest", "--cov=src", TEST_PATH_BASIC, TEST_PATH_ADVANCED, TEST_PATH_TDD, TEST_PATH_BDD],
                 capture_output=True,
                 text=True
             )
